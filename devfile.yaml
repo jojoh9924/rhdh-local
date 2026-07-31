@@ -20,9 +20,9 @@ components:
     container:
       image: quay.io/devfile/universal-developer-image:ubi9-latest
       mountSources: true
-      memoryLimit: 6Gi
+      memoryLimit: 3Gi
       memoryRequest: 521Mi
-      cpuLimit: "2"
+      cpuLimit: "1"
       cpuRequest: "500m"
       env:
         - name: DEVSPACE_SCRIPTS_DIR
@@ -77,9 +77,9 @@ components:
       command: ["tail"]
       args: ["-f", "/dev/null"]
       mountSources: true
-      memoryLimit: 6Gi
+      memoryLimit: 4Gi
       memoryRequest: 1Gi
-      cpuLimit: "2"
+      cpuLimit: "1"
       cpuRequest: "500m"
       env:
         - name: DEVSPACE_SCRIPTS_DIR
@@ -140,13 +140,13 @@ components:
 
   - name: sonataflow
     container:
-      image: registry.redhat.io/openshift-serverless-1/logic-swf-devmode-rhel9:1.37.2
+      image: quay.io/kiegroup/kogito-swf-devmode:latest
       command: ["tail"]
       args: ["-f", "/dev/null"]
       mountSources: true
-      memoryLimit: 6Gi
+      memoryLimit: 3Gi
       memoryRequest: 1Gi
-      cpuLimit: "2"
+      cpuLimit: "1"
       cpuRequest: "500m"
       env:
         - name: WORKFLOW_REPO_DIR
@@ -213,7 +213,7 @@ components:
   
   - name: projects
     volume:
-      size: 20Gi
+      size: 10Gi
 
 commands:
   # ── RHDH Infrastructure ──────────────────────────────────────────────────
