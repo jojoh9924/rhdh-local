@@ -1,86 +1,73 @@
 schemaVersion: 2.3.0
 metadata:
-  name: rhdh-local
+  name: rhdh-plugin-dev
   version: 1.0.0
-  displayName: Plugin Testing on Dev Spaces
+  displayName: RHDH Plugin Development
   description: >-
-    Dev Spaces workspace for developing and testing a Backstage dynamic plugin
-    against a local RHDH instance with SonataFlow.
+    Dev Spaces workspace for developing and testing dynamic plugins against a
+    local RHDH instance. Fork this repo and customize the configuration section
+    below to match your enterprise RHDH deployment.
 attributes:
   controller.devfile.io/storage-type: per-workspace
 
-projects:
-  # These repos are cloned alongside your plugin repo (which is auto-cloned)
-  - name: rhdh-local
-    git:
-      remotes:
-        origin: https://github.com/redhat-developer/rhdh-local.git
+# ╔═══════════════════════════════════════════════════════════════════════════╗
+# ║ ENTERPRISE CONFIGURATION                                                 ║
+# ║                                                                          ║
+# ║ Fork this repo and modify the values below to match your environment.    ║
+# ║ See CUSTOMIZATION.md for detailed instructions.                          ║
+# ╚═══════════════════════════════════════════════════════════════════════════╝
+
 components:
+  # ── Developer Tools Container ────────────────────────────────────────────
   - name: tools
     container:
       image: quay.io/devfile/universal-developer-image:ubi9-latest
       mountSources: true
-      memoryLimit: 3Gi
-      memoryRequest: 521Mi
-      cpuLimit: "1"
-      cpuRequest: "500m"
+      memoryLimit: 6Gi
+      memoryRequest: 512Mi
+      cpuLimit: "2"
+      cpuRequest: 500m
       env:
-        - name: DEVSPACE_SCRIPTS_DIR
-          value: /projects/rhdh-local
+        # ── Customize these for your environment ──
         - name: CLUSTER_APPS_DOMAIN
-          value: "apps.example.com"
-        # ── Plugin Dev Settings ──
-        - name: BACKSTAGE_APP_NAME
-          value: backstage
-        - name: BACKSTAGE_APP_DIR
-          value: /projects/backstage
+          value: "apps.example.com"            # CHANGEME: your OpenShift cluster apps domain
         - name: PLUGIN_NAME
-          value: hello-world # changeme for custom plugin name (e.g., my-plugin)
-        - name: CREATE_APP_VERSION
-          value: "0.7.6"
-        - name: BACKSTAGE_YARN_VERSION
-          value: "3.8.7"
+          value: ""                            # Set per-workspace or leave empty for manual input
+        - name: DYNAMIC_PLUGINS_ROOT
+          value: /dynamic-plugins-root
+        - name: NODE_OPTIONS
+          value: "--max-old-space-size=3072"
+        # ── Proxy (set only if behind corporate proxy) ──
         - name: PROXY_HOST
           value: ""
         - name: PROXY_PORT
           value: ""
-        - name: DEV_FRONTEND_PORT
-          value: "3000"
-        - name: DEV_BACKEND_PORT
-          value: "7008"
       endpoints:
-        - name: ide
-          exposure: public
-          targetPort: 3100
-          protocol: https
-          attributes:
-            discoverable: true
-            urlRewriteSupported: true
-        - name: webpack-dev
+        - name: plugin-dev
           exposure: public
           targetPort: 3000
           protocol: https
           attributes:
             discoverable: true
             urlRewriteSupported: false
-        - name: backstage-dev
-          exposure: public
-          targetPort: 7008
-          protocol: https
-          attributes:
-            discoverable: true
-            urlRewriteSupported: false
+      volumeMounts:
+        - name: dynamic-plugins-root
+          path: /dynamic-plugins-root
+        - name: yarn-cache
+          path: /home/user/.cache/yarn
 
+  # ── RHDH Container ──────────────────────────────────────────────────────
   - name: rhdh
     container:
+      # CHANGEME: pin to the RHDH version your enterprise runs in production
       image: quay.io/rhdh-community/rhdh:1.10
       command: ["tail"]
       args: ["-f", "/dev/null"]
       mountSources: true
-      memoryLimit: 4Gi
+      memoryLimit: 6Gi
       memoryRequest: 1Gi
-      cpuLimit: "1"
-      cpuRequest: "500m"
+      cpuLimit: "2"
+      cpuRequest: 500m
       env:
         - name: DEVSPACE_SCRIPTS_DIR
           value: /projects/rhdh-local
@@ -89,11 +76,13 @@ components:
         - name: RHDH_PUBLIC_ENDPOINT_NAME
           value: rhdh
         - name: CLUSTER_APPS_DOMAIN
-          value: "apps.example.com"
+          value: "apps.example.com"            # CHANGEME: must match tools container
         - name: NODE_ENV
           value: development
         - name: NODE_OPTIONS
-          value: --inspect=0.0.0.0:9229 --no-node-snapshot
+          value: "--inspect=0.0.0.0:9229 --no-node-snapshot"
+        # ── RHDH Plugin Configuration ──
+        # CHANGEME: pin to the catalog index version matching your RHDH image
         - name: CATALOG_INDEX_IMAGE
           value: quay.io/rhdh/plugin-catalog-index:1.10
         - name: WAIT_FOR_PLUGINS_TIMEOUT
@@ -126,48 +115,35 @@ components:
         - name: rhdh-generated
           path: /opt/app-root/src/generated
 
-  - name: dynamic-plugins-root
-    volume:
-      size: 2Gi
-
-  - name: extensions-catalog
-    volume:
-      size: 1Gi
-
-  - name: rhdh-generated
-    volume:
-      size: 512Mi
-
+  # ── SonataFlow Container (optional — remove if not using orchestrator) ──
   - name: sonataflow
     container:
-      image: quay.io/kiegroup/kogito-swf-devmode:latest
+      # CHANGEME: pin to your enterprise's SonataFlow version
+      image: registry.redhat.io/openshift-serverless-1/logic-swf-devmode-rhel9:1.37.2
       command: ["tail"]
       args: ["-f", "/dev/null"]
       mountSources: true
-      memoryLimit: 3Gi
+      memoryLimit: 4Gi
       memoryRequest: 1Gi
-      cpuLimit: "1"
-      cpuRequest: "500m"
+      cpuLimit: "2"
+      cpuRequest: 500m
       env:
         - name: WORKFLOW_REPO_DIR
           value: /projects/rhdh-local
         - name: DEVSPACE_SCRIPTS_DIR
           value: /projects/rhdh-local
-        # ── Network & Proxy Settings (can be overridden at workspace level) ──
         - name: PROXY_HOST
           value: ""
         - name: PROXY_PORT
           value: ""
         - name: NON_PROXY_HOSTS
           value: ""
-        # ── QUARKUS & Kogito Settings ──
         - name: QUARKUS_HTTP_PORT
           value: "8899"
         - name: KOGITO_SERVICE_URL
           value: http://localhost:8899
         - name: KOGITO.CODEGEN.PROCESS.FAILONERROR
           value: "false"
-        # ── Maven & Build Settings ──
         - name: MAX_YAML_CODE_POINTS
           value: "35000000"
         - name: MAX_ENTRY_SIZE
@@ -203,245 +179,120 @@ components:
         - name: sonataflow-workflows
           path: /home/kogito/serverless-workflow-project/src/main/resources
 
+  # ── Volumes ─────────────────────────────────────────────────────────────
+  - name: dynamic-plugins-root
+    volume:
+      size: 2Gi
+  - name: extensions-catalog
+    volume:
+      size: 1Gi
+  - name: rhdh-generated
+    volume:
+      size: 512Mi
+  - name: yarn-cache
+    volume:
+      size: 2Gi
   - name: sonataflow-m2-cache
     volume:
       size: 2Gi
-
   - name: sonataflow-workflows
     volume:
       size: 256Mi
-  
   - name: projects
     volume:
-      size: 10Gi
+      size: 20Gi
 
 commands:
-  # ── RHDH Infrastructure ──────────────────────────────────────────────────
+  # ── RHDH ────────────────────────────────────────────────────────────────
   - id: start-rhdh
     exec:
+      label: "Start RHDH"
       component: rhdh
-      workingDir: /projects/rhdh-local
       commandLine: |
         chmod +x "/projects/rhdh-local/scripts/start-rhdh.sh" 2>/dev/null
-        nohup bash -lc "/projects/rhdh-local/scripts/start-rhdh.sh && echo STARTED > /tmp/rhdh-status || echo FAILED > /tmp/rhdh-status" > /tmp/rhdh-start.log 2>&1 &
+        /projects/rhdh-local/scripts/start-rhdh.sh
+      workingDir: /projects/rhdh-local
       group:
         kind: run
         isDefault: true
-      hotReloadCapable: false
-
   - id: restart-rhdh
     exec:
+      label: "Restart RHDH"
       component: rhdh
-      workingDir: /projects/rhdh-local
       commandLine: |
         echo "[rhdh] Stopping RHDH..."
-        # Find and kill the exact PID holding port 7007 (hex 1B5F)
-        kill_port_7007() {
-          for fd in /proc/[0-9]*/fd/*; do
-            link=$(readlink "$fd" 2>/dev/null) || continue
-            case "$link" in socket:*)
-              inode=${link#socket:[}; inode=${inode%]}
-              if grep ':1B5F ' /proc/net/tcp6 2>/dev/null | grep -q "$inode" || \
-                 grep ':1B5F ' /proc/net/tcp 2>/dev/null | grep -q "$inode"; then
-                pid=$(echo "$fd" | cut -d/ -f3)
-                echo "  killing PID $pid (port 7007)"
-                kill "$1" "$pid" 2>/dev/null || true
-                return 0
-              fi
-            ;; esac
-          done
-          return 1
-        }
-        # Graceful kill (SIGTERM)
-        kill_port_7007 "-15" && sleep 2
-        # Force kill if still there
-        kill_port_7007 "-9" && sleep 1
-        # Also kill any remaining node processes
+        pkill -f 'node.*packages/backend' 2>/dev/null || true
+        sleep 2
         pkill -9 -f 'node.*packages/backend' 2>/dev/null || true
         sleep 1
-        # Verify port is free
-        for i in $(seq 1 15); do
-          if ! grep -q ':1B5F ' /proc/net/tcp6 2>/dev/null && \
-             ! grep -q ':1B5F ' /proc/net/tcp 2>/dev/null; then
-            echo "[rhdh] Port 7007 is free"
-            break
-          fi
-          echo "  port 7007 still in use ($i/15)..."
-          kill_port_7007 "-9"
-          sleep 1
-        done
         echo "[rhdh] Starting RHDH..."
         chmod +x "/projects/rhdh-local/scripts/start-rhdh.sh" 2>/dev/null
-        "/projects/rhdh-local/scripts/start-rhdh.sh"
+        /projects/rhdh-local/scripts/start-rhdh.sh
+      workingDir: /projects/rhdh-local
       group:
         kind: run
+        isDefault: false
 
- # ── Plugin Dev ────────────────────────────────────────────────────────
-
-  # One-time: scaffold a new Backstage app + plugin (run once per workspace)
-  - id: develop-backstage-plugin
+  # ── Plugin Development ───────────────────────────────────────────────────
+  - id: deploy-plugin
     exec:
-      component: tools
-      workingDir: /projects
-      commandLine: |
-        set -e
-        _APP="${BACKSTAGE_APP_NAME:-backstage}"
-        _PLUGIN="${PLUGIN_NAME:-hello-world}"
-        _CREATE_VER="${CREATE_APP_VERSION:-0.7.6}"
-        _YARN_VER="${BACKSTAGE_YARN_VERSION:-3.8.7}"
-
-        # Configure yarn proxy only when explicit proxy env vars are provided.
-        if [ -n "${PROXY_HOST:-}" ] && [ -n "${PROXY_PORT:-}" ]; then
-          _PROXY="http://${PROXY_HOST}:${PROXY_PORT}"
-          cat > .yarnrc.yml <<YARNEOF
-        httpProxy: "$_PROXY"
-        httpsProxy: "$_PROXY"
-        YARNEOF
-          echo "[scaffold] Created .yarnrc.yml with proxy: $_PROXY"
-        else
-          echo "[scaffold] No proxy configured; proceeding without .yarnrc.yml"
-        fi
-
-        # Create Backstage app
-        echo "[scaffold] Creating Backstage app '$_APP' (create-app@$_CREATE_VER)..."
-        echo "$_APP" | npx --yes "@backstage/create-app@$_CREATE_VER"
-        cd "$_APP"
-
-        # Align yarn version
-        yarn set version "$_YARN_VER"
-        echo "[scaffold] Set yarn to $_YARN_VER"
-        yes | yarn install
-
-        # Create frontend plugin (non-interactive — avoids Node 24 readline bug)
-        echo "[scaffold] Creating frontend plugin: $_PLUGIN"
-        yarn new --select plugin --option id="$_PLUGIN"
-
-        echo ""
-        echo "[scaffold] Done! Your app is at /projects/$_APP"
-        echo "[scaffold] Plugin source:  /projects/$_APP/plugins/$_PLUGIN"
-        echo ""
-        echo "[scaffold] Next steps:"
-        echo "  1. Run 'start-plugin-dev' task to start the dev server"
-        echo "  2. Run 'deploy-dynamic-plugin' task to build + export for RHDH"
-        echo "  3. Run 'restart-rhdh' task to load the plugin in RHDH"
-        echo "  4. Navigate to /$_PLUGIN in RHDH"
-      group:
-        kind: build
-
-  # start the plugin dev server
-  - id: start-plugin-dev
-    exec:
-      component: tools
-      commandLine: |
-        _APP_DIR="${BACKSTAGE_APP_DIR:-/projects/${BACKSTAGE_APP_NAME:-backstage}}"
-        _PLUGIN="${PLUGIN_NAME:-hello-world}"
-        _FE_PORT="${DEV_FRONTEND_PORT:-3000}"
-        _BE_PORT="${DEV_BACKEND_PORT:-7008}"
-
-        # Patch backend port 7007→$_BE_PORT to avoid conflict with RHDH
-        sed -i "s/port: 7007/port: $_BE_PORT/g; s/localhost:7007/localhost:$_BE_PORT/g" "$_APP_DIR"/app-config*.yaml 2>/dev/null
-
-        # Force dev server to bind to 0.0.0.0 so the OpenShift route can reach it
-        if ! grep -q 'listen:' "$_APP_DIR"/app-config*.yaml 2>/dev/null; then
-          sed -i "/^app:/a\\  listen:\\n    host: 0.0.0.0\\n    port: $_FE_PORT" "$_APP_DIR"/app-config*.yaml
-        fi
-
-        # Allow external host headers (webpack-dev route hostname)
-        find "$_APP_DIR/node_modules/@backstage/cli/dist" -name 'server.cjs.js' \
-          -exec sed -i 's/allowedHosts: \[url.hostname\]/allowedHosts: "all"/' {} \;
-
-        cd "$_APP_DIR/plugins/$_PLUGIN"
-        BROWSER=none yarn start
-      group:
-        kind: run
-
-  - id: deploy-dynamic-plugin
-    exec:
+      label: "Deploy plugin to RHDH"
       component: tools
       commandLine: |
         set -e
-        _APP_DIR="${BACKSTAGE_APP_DIR:-/projects/${BACKSTAGE_APP_NAME:-backstage}}"
         _PLUGIN="${PLUGIN_NAME:-}"
-
-        _SCRIPTS_DIR="${DEVSPACE_SCRIPTS_DIR:-/projects/rhdh-devspace}"
-
-        # Prompt for plugin name when PLUGIN_NAME is not set
         if [ -z "$_PLUGIN" ] && [ -t 0 ]; then
-          read -r -p "[plugin] Enter plugin name: " _PLUGIN
+          read -r -p "[plugin] Enter plugin directory name: " _PLUGIN
         fi
-        [ -z "$_PLUGIN" ] && {
-          echo "[plugin] ERROR: Plugin name is required (set PLUGIN_NAME or provide input)"
-          exit 1
-        }
+        [ -z "$_PLUGIN" ] && { echo "[plugin] ERROR: Set PLUGIN_NAME or provide input"; exit 1; }
 
-        echo "[plugin] Deploying the plugin: $_PLUGIN"
+        _PLUGIN_DIR="/projects/$_PLUGIN"
+        [ -d "$_PLUGIN_DIR" ] || { echo "[plugin] ERROR: Directory $_PLUGIN_DIR not found"; exit 1; }
 
-        mkdir -p "$_SCRIPTS_DIR/dynamic-root-plugins"
-        DYNAMIC_ROOT=$(find /projects -maxdepth 3 -type d -name 'dynamic-root*-plugins' 2>/dev/null | head -1)
-        [ -z "$DYNAMIC_ROOT" ] && { echo "ERROR: No dynamic-root-plugins found under /projects"; exit 1; }
-
-        _PLUGIN_DIR="$_APP_DIR/plugins/$_PLUGIN"
-        
         cd "$_PLUGIN_DIR"
-
-        yarn add -D @red-hat-developer-hub/cli
-
-        npm pkg set scripts.export-dynamic="rhdh-cli plugin export --clean"
-
-        yarn export-dynamic
-
-        echo "=== Exporting as dynamic plugin ==="
-        npx --yes @red-hat-developer-hub/cli@latest plugin export --dev \
-          --dynamic-plugins-root "$DYNAMIC_ROOT"
+        echo "[plugin] Installing dependencies..."
+        yarn install
+        echo "[plugin] Exporting dynamic plugin..."
+        npx --yes @red-hat-developer-hub/cli@latest plugin export --clean \
+          --dynamic-plugins-root /dynamic-plugins-root
+        echo ""
+        echo "[plugin] ✓ Deployed to /dynamic-plugins-root"
+        echo "[plugin] Run 'Restart RHDH' to load the updated plugin."
+      workingDir: /projects
       group:
         kind: build
+        isDefault: false
 
   # ── SonataFlow ───────────────────────────────────────────────────────────
   - id: start-sonataflow
     exec:
+      label: "Start SonataFlow"
       component: sonataflow
-      workingDir: /home/kogito/serverless-workflow-project
       commandLine: |
         chmod +x "/projects/rhdh-local/scripts/start-orchestrator.sh" 2>/dev/null
-        "/projects/rhdh-local/scripts/start-orchestrator.sh"
+        /projects/rhdh-local/scripts/start-orchestrator.sh
+      workingDir: /home/kogito/serverless-workflow-project
       group:
         kind: run
-
+        isDefault: false
   - id: restart-sonataflow
     exec:
-      component: sonataflow # 5005, 8899
+      label: "Restart SonataFlow"
+      component: sonataflow
       commandLine: |
-        echo "[sonataflow] Stopping SonataFlow server..."
-        # Find PID bound to tcp port 8899 (hex 22C3) without requiring lsof/netstat/fuser.
-        find_pid_by_port_hex() {
-          _hex_port="$1"
-          for fd in /proc/[0-9]*/fd/*; do
-            link=$(readlink "$fd" 2>/dev/null) || continue
-            case "$link" in socket:*)
-              inode=${link#socket:[}; inode=${inode%]}
-              if grep ":${_hex_port} " /proc/net/tcp6 2>/dev/null | grep -q "$inode" || \
-                 grep ":${_hex_port} " /proc/net/tcp 2>/dev/null | grep -q "$inode"; then
-                echo "$fd" | cut -d/ -f3
-                return 0
-              fi
-            ;; esac
-          done
-          return 1
-        }
-
-        PID=$(find_pid_by_port_hex 22C3) || true
-        if [ -n "${PID:-}" ]; then
-          kill "$PID" 2>/dev/null && echo "[sonataflow] ✓ Stopped SonataFlow server (PID $PID)" || \
-          { kill -9 "$PID" 2>/dev/null; echo "[sonataflow] ✓ Force-killed SonataFlow server (PID $PID)"; }
-        else
-          echo "[sonataflow] SonataFlow server is not running on port 8899"
-        fi
-
-        echo "[sonataflow] Starting sonataflow server..."
+        echo "[sonataflow] Stopping..."
+        pkill -f 'java.*quarkus' 2>/dev/null || true
+        sleep 3
+        pkill -9 -f 'java.*quarkus' 2>/dev/null || true
+        sleep 1
+        echo "[sonataflow] Starting..."
         chmod +x "/projects/rhdh-local/scripts/start-orchestrator.sh" 2>/dev/null
-        "/projects/rhdh-local/scripts/start-orchestrator.sh"
+        /projects/rhdh-local/scripts/start-orchestrator.sh
+      workingDir: /home/kogito/serverless-workflow-project
       group:
         kind: run
+        isDefault: false
+
 events:
   postStart:
     - start-rhdh
