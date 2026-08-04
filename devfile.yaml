@@ -5,17 +5,9 @@ metadata:
   displayName: RHDH Plugin Development
   description: >-
     Dev Spaces workspace for developing and testing dynamic plugins against a
-    local RHDH instance. Fork this repo and customize the configuration section
-    below to match your enterprise RHDH deployment.
+    local RHDH instance. Enterprise example configuration.
 attributes:
   controller.devfile.io/storage-type: per-workspace
-
-# ╔═══════════════════════════════════════════════════════════════════════════╗
-# ║ ENTERPRISE CONFIGURATION                                                 ║
-# ║                                                                          ║
-# ║ Fork this repo and modify the values below to match your environment.    ║
-# ║ See CUSTOMIZATION.md for detailed instructions.                          ║
-# ╚═══════════════════════════════════════════════════════════════════════════╝
 
 components:
   # ── Developer Tools Container ────────────────────────────────────────────
@@ -28,16 +20,14 @@ components:
       cpuLimit: "2"
       cpuRequest: 500m
       env:
-        # ── Customize these for your environment ──
         - name: CLUSTER_APPS_DOMAIN
-          value: "apps.example.com"            # CHANGEME: your OpenShift cluster apps domain
+          value: "apps.sandbox-m2.ll9k.p1.openshiftapps.com"
         - name: PLUGIN_NAME
-          value: ""                            # Set per-workspace or leave empty for manual input
+          value: ""
         - name: DYNAMIC_PLUGINS_ROOT
           value: /dynamic-plugins-root
         - name: NODE_OPTIONS
           value: "--max-old-space-size=3072"
-        # ── Proxy (set only if behind corporate proxy) ──
         - name: PROXY_HOST
           value: ""
         - name: PROXY_PORT
@@ -59,7 +49,6 @@ components:
   # ── RHDH Container ──────────────────────────────────────────────────────
   - name: rhdh
     container:
-      # CHANGEME: pin to the RHDH version your enterprise runs in production
       image: quay.io/rhdh-community/rhdh:1.10
       command: ["tail"]
       args: ["-f", "/dev/null"]
@@ -76,13 +65,11 @@ components:
         - name: RHDH_PUBLIC_ENDPOINT_NAME
           value: rhdh
         - name: CLUSTER_APPS_DOMAIN
-          value: "apps.example.com"            # CHANGEME: must match tools container
+          value: "apps.sandbox-m2.ll9k.p1.openshiftapps.com"
         - name: NODE_ENV
           value: development
         - name: NODE_OPTIONS
           value: "--inspect=0.0.0.0:9229 --no-node-snapshot"
-        # ── RHDH Plugin Configuration ──
-        # CHANGEME: pin to the catalog index version matching your RHDH image
         - name: CATALOG_INDEX_IMAGE
           value: quay.io/rhdh/plugin-catalog-index:1.10
         - name: WAIT_FOR_PLUGINS_TIMEOUT
@@ -115,7 +102,6 @@ components:
         - name: rhdh-generated
           path: /opt/app-root/src/generated
 
-
   # ── Volumes ─────────────────────────────────────────────────────────────
   - name: dynamic-plugins-root
     volume:
@@ -129,12 +115,6 @@ components:
   - name: yarn-cache
     volume:
       size: 2Gi
-  - name: sonataflow-m2-cache
-    volume:
-      size: 2Gi
-  - name: sonataflow-workflows
-    volume:
-      size: 256Mi
   - name: projects
     volume:
       size: 20Gi
@@ -193,41 +173,10 @@ commands:
         npx --yes @red-hat-developer-hub/cli@latest plugin export --clean \
           --dynamic-plugins-root /dynamic-plugins-root
         echo ""
-        echo "[plugin] ✓ Deployed to /dynamic-plugins-root"
-        echo "[plugin] Run 'Restart RHDH' to load the updated plugin."
+        echo "[plugin] Done. Run 'Restart RHDH' to load the updated plugin."
       workingDir: /projects
       group:
         kind: build
-        isDefault: false
-
-  # ── SonataFlow ───────────────────────────────────────────────────────────
-  - id: start-sonataflow
-    exec:
-      label: "Start SonataFlow"
-      component: sonataflow
-      commandLine: |
-        chmod +x "/projects/rhdh-local/scripts/start-orchestrator.sh" 2>/dev/null
-        /projects/rhdh-local/scripts/start-orchestrator.sh
-      workingDir: /home/kogito/serverless-workflow-project
-      group:
-        kind: run
-        isDefault: false
-  - id: restart-sonataflow
-    exec:
-      label: "Restart SonataFlow"
-      component: sonataflow
-      commandLine: |
-        echo "[sonataflow] Stopping..."
-        pkill -f 'java.*quarkus' 2>/dev/null || true
-        sleep 3
-        pkill -9 -f 'java.*quarkus' 2>/dev/null || true
-        sleep 1
-        echo "[sonataflow] Starting..."
-        chmod +x "/projects/rhdh-local/scripts/start-orchestrator.sh" 2>/dev/null
-        /projects/rhdh-local/scripts/start-orchestrator.sh
-      workingDir: /home/kogito/serverless-workflow-project
-      group:
-        kind: run
         isDefault: false
 
 events:
